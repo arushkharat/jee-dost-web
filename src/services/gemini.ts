@@ -1,6 +1,15 @@
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+// Use process.env.GEMINI_API_KEY as required by guidelines
+// Fallback to import.meta.env for local/Vercel environments if process.env is unavailable
+const meta = import.meta as any;
+const apiKey = process.env.GEMINI_API_KEY || (meta.env && meta.env.VITE_GEMINI_API_KEY) || "";
+
+if (!apiKey) {
+  console.error("CRITICAL: GEMINI_API_KEY is not set. Please set it in your environment variables.");
+}
+
+const ai = new GoogleGenAI({ apiKey });
 
 const SYSTEM_INSTRUCTION = `You are 'JEE Dost', an expert IIT-JEE tutor who is professional yet relatable. 
     
@@ -36,53 +45,55 @@ export async function solveQuestion(
   isFollowUp: boolean = false,
   onChunk?: (chunk: string) => void
 ) {
-  const parts: any[] = [];
+  try {
+    const parts: any[] = [];
 
-  if (imageData && mimeType) {
+    if (imageData && mimeType) {
+      parts.push({
+        inlineData: {
+          data: imageData.split(",")[1],
+          mimeType: mimeType,
+        },
+      });
+    }
+
     parts.push({
-      inlineData: {
-        data: imageData.split(",")[1],
-        mimeType: mimeType,
-      },
-    });
-  }
-
-  parts.push({
-    text: `Subject: ${subject}. Question/Context: "${textPrompt}"
-    ${isFollowUp ? "This is a follow-up doubt. Be even clearer and more encouraging." : ""}`,
-  });
-
-  const config = {
-    systemInstruction: SYSTEM_INSTRUCTION,
-    thinkingConfig: {
-      thinkingLevel: ThinkingLevel.LOW
-    }
-  };
-
-  if (onChunk) {
-    const stream = await ai.models.generateContentStream({
-      model: "gemini-3-flash-preview",
-      contents: [{ parts }],
-      config
+      text: `Subject: ${subject}. Question/Context: "${textPrompt}"
+      ${isFollowUp ? "This is a follow-up doubt. Be even clearer and more encouraging." : ""}`,
     });
 
-    let fullText = "";
-    for await (const chunk of stream) {
-      const text = chunk.text;
-      if (text) {
-        fullText += text;
-        onChunk(text);
+    const config = {
+      systemInstruction: SYSTEM_INSTRUCTION,
+    };
+
+    if (onChunk) {
+      const stream = await ai.models.generateContentStream({
+        model: "gemini-3-flash-preview",
+        contents: [{ parts }],
+        config
+      });
+
+      let fullText = "";
+      for await (const chunk of stream) {
+        const text = chunk.text;
+        if (text) {
+          fullText += text;
+          onChunk(text);
+        }
       }
-    }
-    return fullText;
-  } else {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{ parts }],
-      config
-    });
+      return fullText;
+    } else {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [{ parts }],
+        config
+      });
 
-    return response.text;
+      return response.text;
+    }
+  } catch (error) {
+    console.error("Gemini Service Error:", error);
+    throw error;
   }
 }
 
