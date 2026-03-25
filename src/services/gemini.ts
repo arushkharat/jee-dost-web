@@ -1,15 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, GenerateContentResponse } from "@google/genai";
 
-// Use process.env.GEMINI_API_KEY as required by guidelines
-// Fallback to import.meta.env for local/Vercel environments if process.env is unavailable
-const meta = import.meta as any;
-const apiKey = process.env.GEMINI_API_KEY || (meta.env && meta.env.VITE_GEMINI_API_KEY) || "";
-
-if (!apiKey) {
-  console.error("CRITICAL: GEMINI_API_KEY is not set. Please set it in your environment variables.");
-}
-
-const ai = new GoogleGenAI({ apiKey });
+// Try to initialize frontend SDK (works in this environment)
+const frontendAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 const SYSTEM_INSTRUCTION = `You are 'JEE Dost', an expert IIT-JEE tutor who is professional yet relatable. 
     
@@ -45,29 +37,33 @@ export async function solveQuestion(
   isFollowUp: boolean = false,
   onChunk?: (chunk: string) => void
 ) {
-  try {
-    const parts: any[] = [];
+  const parts: any[] = [];
 
-    if (imageData && mimeType) {
-      parts.push({
-        inlineData: {
-          data: imageData.split(",")[1],
-          mimeType: mimeType,
-        },
-      });
-    }
-
+  if (imageData && mimeType) {
     parts.push({
-      text: `Subject: ${subject}. Question/Context: "${textPrompt}"
-      ${isFollowUp ? "This is a follow-up doubt. Be even clearer and more encouraging." : ""}`,
+      inlineData: {
+        data: imageData.split(",")[1],
+        mimeType: mimeType,
+      },
     });
+  }
 
-    const config = {
-      systemInstruction: SYSTEM_INSTRUCTION,
-    };
+  parts.push({
+    text: `Subject: ${subject}. Question/Context: "${textPrompt}"
+    ${isFollowUp ? "This is a follow-up doubt. Be even clearer and more encouraging." : ""}`,
+  });
 
+  const config = {
+    systemInstruction: SYSTEM_INSTRUCTION,
+    thinkingConfig: {
+      thinkingLevel: ThinkingLevel.LOW
+    }
+  };
+
+  // Try frontend call first (streaming supported)
+  try {
     if (onChunk) {
-      const stream = await ai.models.generateContentStream({
+      const stream = await frontendAi.models.generateContentStream({
         model: "gemini-3-flash-preview",
         contents: [{ parts }],
         config
@@ -83,17 +79,33 @@ export async function solveQuestion(
       }
       return fullText;
     } else {
-      const response = await ai.models.generateContent({
+      const response = await frontendAi.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [{ parts }],
         config
       });
-
       return response.text;
     }
   } catch (error) {
-    console.error("Gemini Service Error:", error);
-    throw error;
+    console.warn("Frontend Gemini call failed, falling back to backend proxy...", error);
+    
+    // FALLBACK: Use the backend proxy (for Vercel-like deployments where API key is hidden)
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        contents: [{ parts }],
+        config
+      })
+    });
+    
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    
+    // Extract text from the response structure
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (onChunk && text) onChunk(text);
+    return text;
   }
 }
 
@@ -116,3 +128,15 @@ export async function solveFollowUp(
   
   return solveQuestion(null, null, prompt, subject, true, onChunk);
 }
+
+// User's requested simplified function
+export const askGemini = async (question: string) => {
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question })
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  return data.candidates?.[0]?.content?.parts?.[0]?.text;
+};
