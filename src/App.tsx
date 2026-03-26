@@ -6,13 +6,19 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1. Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
+
+    // 2. Listen for the login "Handshake"
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      // This part clears that long ugly URL after you're logged in
+      if (session) window.history.replaceState({}, document.title, "/");
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
