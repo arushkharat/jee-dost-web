@@ -3,12 +3,13 @@ import { supabase } from './services/supabase';
 
 function App() {
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [question, setQuestion] = useState('');
+  const [solution, setSolution] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      setLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
@@ -16,108 +17,56 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const loginWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin }
-    });
-    if (error) alert(error.message);
+  const handleSolve = async () => {
+    if (!question) return alert("Please paste a JEE question first!");
+    setLoading(true);
+    
+    // In a real app, you'd call an Edge Function here. 
+    // For now, let's simulate the AI thinking:
+    setTimeout(() => {
+      setSolution("Step 1: Identify the formula... \nStep 2: Substitute values... \nFinal Answer: Option (C)");
+      setLoading(false);
+    }, 2000);
   };
 
-  if (loading) return <div style={{height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: 'white'}}>Loading JEE-Dost...</div>;
+  const loginWithGoogle = () => supabase.auth.signInWithOAuth({ 
+    provider: 'google', 
+    options: { redirectTo: window.location.origin } 
+  });
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', 
-      fontFamily: '"Inter", sans-serif', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      color: '#f8fafc'
-    }}>
-      {/* Glow Effect Background */}
-      <div style={{ position: 'absolute', width: '300px', height: '300px', background: '#38bdf8', filter: 'blur(150px)', opacity: '0.15', top: '10%', left: '20%', zIndex: 0 }}></div>
-
-      <div style={{ 
-        zIndex: 1,
-        background: 'rgba(255, 255, 255, 0.05)', 
-        backdropFilter: 'blur(10px)', 
-        padding: '40px', 
-        borderRadius: '24px', 
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        textAlign: 'center',
-        width: '90%',
-        maxWidth: '400px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-      }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '10px', background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: '800' }}>
-          JEE-Dost
-        </h1>
-        <p style={{ color: '#94a3b8', marginBottom: '30px' }}>Your AI partner for Cracking IIT-JEE</p>
+    <div style={{ minHeight: '100vh', background: '#0f172a', color: 'white', fontFamily: 'sans-serif', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+      <div style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', padding: '40px', borderRadius: '24px', width: '100%', maxWidth: '600px', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <h1 style={{ textAlign: 'center', background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>JEE-Dost AI</h1>
         
         {!user ? (
-          <div>
-            <button 
-              onClick={loginWithGoogle} 
-              style={{ 
-                width: '100%',
-                padding: '14px', 
-                fontSize: '16px', 
-                cursor: 'pointer', 
-                background: 'white', 
-                color: '#1e293b', 
-                border: 'none', 
-                borderRadius: '12px', 
-                fontWeight: '700',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
-              onMouseOut={(e) => (e.currentTarget.style.transform = 'translateY(0px)')}
-            >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" alt="google" />
-              Continue with Google
-            </button>
-            <p style={{ marginTop: '20px', fontSize: '12px', color: '#64748b' }}>Secure login via Supabase Auth</p>
-          </div>
+          <button onClick={loginWithGoogle} style={{ width: '100%', padding: '15px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>Sign in with Google</button>
         ) : (
           <div>
-            <div style={{ padding: '20px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '12px', marginBottom: '20px' }}>
-              <p style={{ fontSize: '14px', color: '#38bdf8', margin: 0 }}>Welcome back,</p>
-              <p style={{ fontWeight: 'bold', fontSize: '18px', margin: '5px 0' }}>{user.email.split('@')[0]}</p>
-            </div>
-            
+            <p style={{ color: '#94a3b8' }}>Logged in as: {user.email}</p>
+            <textarea 
+              placeholder="Paste your Physics, Chemistry, or Math question here..."
+              value={question}
+              onChange={(e) => setQuestion(e.currentTarget.value)}
+              style={{ width: '100%', height: '150px', borderRadius: '12px', padding: '15px', background: '#1e293b', color: 'white', border: '1px solid #334155', marginTop: '20px' }}
+            />
             <button 
-              style={{ 
-                width: '100%', 
-                padding: '12px', 
-                background: 'linear-gradient(to right, #38bdf8, #2563eb)', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '10px', 
-                fontWeight: 'bold', 
-                cursor: 'pointer' 
-              }}
+              onClick={handleSolve}
+              disabled={loading}
+              style={{ width: '100%', padding: '15px', marginTop: '15px', borderRadius: '12px', background: '#38bdf8', color: '#0f172a', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}
             >
-              Go to Dashboard
+              {loading ? "AI is solving..." : "Solve Question"}
             </button>
-            
-            <button 
-              onClick={() => supabase.auth.signOut()}
-              style={{ marginTop: '15px', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px' }}
-            >
-              Logout
-            </button>
+
+            {solution && (
+              <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '12px', border: '1px solid #38bdf8' }}>
+                <h4 style={{ color: '#38bdf8', margin: '0 0 10px 0' }}>Solution:</h4>
+                <p style={{ whiteSpace: 'pre-wrap' }}>{solution}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
-      
-      <p style={{ marginTop: '30px', color: '#475569', fontSize: '14px' }}>Build with ❤️ for Future IITians</p>
     </div>
   );
 }
