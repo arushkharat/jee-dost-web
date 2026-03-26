@@ -1,7 +1,15 @@
 import { GoogleGenAI, ThinkingLevel, GenerateContentResponse } from "@google/genai";
 
 // Try to initialize frontend SDK (works in this environment)
-const frontendAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const getApiKey = () => {
+  try {
+    return (window as any).process?.env?.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  } catch {
+    return '';
+  }
+};
+
+const frontendAi = new GoogleGenAI({ apiKey: getApiKey() });
 
 const SYSTEM_INSTRUCTION = `You are 'JEE Dost', an expert IIT-JEE tutor who is professional yet relatable. 
     
